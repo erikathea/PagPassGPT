@@ -1,4 +1,4 @@
-dataset_name="rockyou"
+#dataset_name="rockyou"
 cleaned_dataset="./dataset/${dataset_name}-cleaned.txt"
 model_path="./model/last-step/"
 output_path="./generate/"

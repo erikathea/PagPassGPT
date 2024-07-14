@@ -6,6 +6,7 @@ from datasets import load_dataset
 from transformers import GPT2Config
 from transformers import GPT2LMHeadModel
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
+import torch
 import time
 import argparse
 
@@ -15,6 +16,7 @@ parser.add_argument("--dataset_path", help="path of preprocessed train dataset",
 parser.add_argument("--vocabfile_path", help="path of vocab file", type=str, default="./tokenizer/vocab.json")
 parser.add_argument("--model_path", help="directory to save model", type=str, default="./model/")
 parser.add_argument("--log_path", help="directory of log", type=str, default="./log/")
+parser.add_argument("--resume_from_checkpoint", help="path to resume model training from a checkpoint", type=str, default=None)
 # environment parameter setting
 parser.add_argument("--random_seed", help="random seed", type=int, default=42)
 parser.add_argument("--num_processer", help="num of processer (cpu logit cores)", type=int, default=1)
@@ -24,7 +26,7 @@ parser.add_argument("--embed_size", help="embedding size", type=int, default=384
 parser.add_argument("--layer_num", help="num of layers", type=int, default=8)
 parser.add_argument("--head_num", help="num of multi head", type=int, default=12)
 # training parameter setting
-parser.add_argument("--epoch_num", help="num of epoch (containing early stop))", type=int, default=30)
+parser.add_argument("--epoch_num", help="num of epoch (containing early stop)", type=int, default=30)
 parser.add_argument("--batch_size", help="batch_size", type=int, default=512)
 parser.add_argument("--eval_step", help="eval model every n steps", type=int, default=2000)
 parser.add_argument("--save_step", help="save model every n steps", type=int, default=6000)
@@ -36,6 +38,7 @@ train_dataset_path = args.dataset_path
 vocab_file = args.vocabfile_path
 model_output_dir = args.model_path
 log_dir = args.log_path
+resume_from_checkpoint = args.resume_from_checkpoint
 
 random_seed = args.random_seed
 num_processer = args.num_processer
@@ -61,40 +64,44 @@ tokenizer = CharTokenizer(vocab_file=vocab_file,
                           pad_token="<PAD>",
                           )
 
-
 print(f'Load dataset.')
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 train_dataset = load_dataset('text', data_files=train_dataset_path, num_proc=num_processer, split='train')
 train_dataset = train_dataset.map(lambda examples: tokenizer(examples['text'], max_len=input_size, padding=True), batched=True)
 
 print(f'Split dataset into training set and validation set.')
-train_dataset= train_dataset.train_test_split(test_size=0.125)
+train_dataset = train_dataset.train_test_split(test_size=0.125)
 eval_dataset = train_dataset['test']
 train_dataset = train_dataset['train']
 
-print(f'Load model config.')
-config = GPT2Config(
-    vocab_size=tokenizer.vocab_size,
-    n_positions=input_size,
-    n_embd=embed_size,
-    n_layer=layer_num,
-    n_head=head_num,
-    bos_token_id=tokenizer.bos_token_id,
-    eos_token_id=tokenizer.eos_token_id,
-    activation_function="gelu_new",
-    resid_pdrop=0.1,
-    embd_pdrop=0.1,
-    attn_pdrop=0.1,
-    layer_norm_epsilon=1e-5,
-    initializer_range=0.02,
-    scale_attn_by_inverse_layer_idx=False,
-    reorder_and_upcast_attn=False,
-)
+if resume_from_checkpoint and os.path.exists(resume_from_checkpoint):
+    print(f'Resuming training from checkpoint: {resume_from_checkpoint}')
+    model = GPT2LMHeadModel.from_pretrained(resume_from_checkpoint)
+else:
+    print(f'Load model config.')
+    config = GPT2Config(
+        vocab_size=tokenizer.vocab_size,
+        n_positions=input_size,
+        n_embd=embed_size,
+        n_layer=layer_num,
+        n_head=head_num,
+        bos_token_id=tokenizer.bos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+        activation_function="gelu_new",
+        resid_pdrop=0.1,
+        embd_pdrop=0.1,
+        attn_pdrop=0.1,
+        layer_norm_epsilon=1e-5,
+        initializer_range=0.02,
+        scale_attn_by_inverse_layer_idx=False,
+        reorder_and_upcast_attn=False,
+    )
+    model = GPT2LMHeadModel(config=config)
+    print(f"Num parameters: {model.num_parameters()}")
+    print(model)
 
-model = GPT2LMHeadModel(config=config)
-print(f"Num parameters: {model.num_parameters()}")
-print(model)
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
 print(f'Load training config.')
 training_args = TrainingArguments(
@@ -103,7 +110,7 @@ training_args = TrainingArguments(
     num_train_epochs=epoch_num,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
-    eval_steps = eval_step,
+    eval_steps=eval_step,
     save_steps=save_step,
     save_strategy='steps',
     evaluation_strategy='steps',
@@ -112,8 +119,11 @@ training_args = TrainingArguments(
     seed=random_seed,
     metric_for_best_model='eval_loss',
     load_best_model_at_end=True,
-    save_total_limit=1
-    )
+    save_total_limit=1,
+    # Enable multi-GPU training
+    dataloader_num_workers=num_processer,
+    fp16=True,  # Enable mixed precision training for faster training
+)
 
 trainer = Trainer(
     model=model,
@@ -122,14 +132,13 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
     callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stop)],
-    
 )
 
 print(f'*'*30)
 print(f'Training begin.')
-trainer.train()
+trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
-trainer.save_model(model_output_dir+"last-step/")
-print(f'Model saved in {model_output_dir+"last-step/"}')
+trainer.save_model(model_output_dir + "last-step/")
+print(f'Model saved in {model_output_dir + "last-step/"}')
 print(f'*'*30)
 print(f'Training done.')
