@@ -27,11 +27,11 @@ TYPE_ID_DICT = {'L':(51, 103),
                 'N':(41, 51),
                 'S':(103, 135),
                 }
-d
+
 model_path = args.model_path
 vocab_file = args.vocabfile_path
 pattern_file = args.pattern_path
-output_path = args.vocabfile_path
+output_path = args.output_path
 
 n = args.generate_num
 save_num = args.save_num

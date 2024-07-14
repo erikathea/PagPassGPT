@@ -17,6 +17,30 @@ class CharTokenizer(PreTrainedTokenizer):
         unk_token=None,
         pad_token=None,
     ):
+        # Initialize _added_tokens_encoder and _added_tokens_decoder before calling super().__init__()
+        self._added_tokens_encoder = {}
+        self._added_tokens_decoder = {}
+
+        # Load vocab file and set encoder first
+        try:
+            with open(vocab_file, encoding="utf-8") as vocab_handle:
+                self.encoder = json.load(vocab_handle)
+                # Debug: Confirm encoder is loaded
+                print(f"Encoder loaded: {self.encoder}")
+        except FileNotFoundError:
+            raise ValueError(f"Vocab file {vocab_file} not found.")
+        except json.JSONDecodeError:
+            raise ValueError(f"Vocab file {vocab_file} is not valid JSON.")
+
+        self.decoder = {v: k for k, v in self.encoder.items()}
+
+        # Initialize token IDs before calling super().__init__()
+        self.bos_token_id = self.encoder.get(bos_token)
+        self.eos_token_id = self.encoder.get(eos_token)
+        self.sep_token_id = self.encoder.get(sep_token)
+        self.pad_token_id = self.encoder.get(pad_token)
+        self.unk_token_id = self.encoder.get(unk_token)
+
         super().__init__(
             bos_token=bos_token,
             eos_token=eos_token,
@@ -24,21 +48,16 @@ class CharTokenizer(PreTrainedTokenizer):
             sep_token=sep_token,
             unk_token=unk_token,
         )
+
         self.add_bos_and_eos = add_bos_and_eos
         self.padding_side = padding_side
-            
-        with open(vocab_file, encoding="utf-8") as vocab_handle:
-            self.encoder = json.load(vocab_handle)
-        
-        self.decoder = {v: k for k, v in self.encoder.items()}
 
-        self.bos_token_id = self.encoder[self.bos_token]
-        self.eos_token_id = self.encoder[self.eos_token]
-        self.sep_token_id = self.encoder[self.sep_token]
-        self.pad_token_id = self.encoder[self.pad_token]
-        self.unk_token_id = self.encoder[self.unk_token]
-
-
+        # Debug: Check token ids
+        print(f"BOS token ID: {self.bos_token_id}")
+        print(f"EOS token ID: {self.eos_token_id}")
+        print(f"SEP token ID: {self.sep_token_id}")
+        print(f"PAD token ID: {self.pad_token_id}")
+        print(f"UNK token ID: {self.unk_token_id}")
 
     @property
     def vocab_size(self):
@@ -50,18 +69,6 @@ class CharTokenizer(PreTrainedTokenizer):
     def _tokenize(self, text: str) -> List[char]:
         if text == '':
             return []
-        # result = []
-        # while len(text) != 0:
-        #     is_hit = False
-        #     for vocab in self.encoder:
-        #         if text.startswith(vocab):
-        #             result.append(vocab)
-        #             text = text[len(vocab):]
-        #             is_hit = True
-        #             break
-        #     if not is_hit:
-        #         result.append(self.unk_token)
-        #         text = text[1:]
         return text.split(' ')
 
     def _convert_token_to_id(self, token):
@@ -179,7 +186,6 @@ class CharTokenizer(PreTrainedTokenizer):
 
 def main():
     vocab_file = "vocab.json"
-
     tokenizer = CharTokenizer(vocab_file=vocab_file, 
                               bos_token="<BOS>",
                               eos_token="<EOS>",
@@ -189,17 +195,12 @@ def main():
                             )
 
     print(f"vocab_size: {tokenizer.vocab_size}")
-
     texts = ["L4 N3 S1 <SEP> P a s s 1 2 3 $"]
-
     for text in texts: 
         indices = tokenizer.encode(text, return_is_tensor=True)
         reconstructed_text = tokenizer.decode(indices)
-        
         print('inputs:{}'.format(text))
         print('encoded:{}'.format(indices))
         print('decoded:{}'.format(reconstructed_text))
-
-
 if __name__ == "__main__":
     main()

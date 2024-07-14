@@ -6,6 +6,7 @@ from datasets import load_dataset
 from transformers import GPT2Config
 from transformers import GPT2LMHeadModel
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
+from accelerate import Accelerator
 import time
 import argparse
 
@@ -40,7 +41,6 @@ log_dir = args.log_path
 random_seed = args.random_seed
 num_processer = args.num_processer
 
-# model params: 14260608
 input_size = args.input_size
 embed_size = args.embed_size
 layer_num = args.layer_num
@@ -61,14 +61,13 @@ tokenizer = CharTokenizer(vocab_file=vocab_file,
                           pad_token="<PAD>",
                           )
 
-
 print(f'Load dataset.')
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 train_dataset = load_dataset('text', data_files=train_dataset_path, num_proc=num_processer, split='train')
 train_dataset = train_dataset.map(lambda examples: tokenizer(examples['text'], max_len=input_size, padding=True), batched=True)
 
 print(f'Split dataset into training set and validation set.')
-train_dataset= train_dataset.train_test_split(test_size=0.125)
+train_dataset = train_dataset.train_test_split(test_size=0.125)
 eval_dataset = train_dataset['test']
 train_dataset = train_dataset['train']
 
@@ -91,10 +90,11 @@ config = GPT2Config(
     reorder_and_upcast_attn=False,
 )
 
+accelerator = Accelerator()
+
 model = GPT2LMHeadModel(config=config)
 print(f"Num parameters: {model.num_parameters()}")
 print(model)
-
 
 print(f'Load training config.')
 training_args = TrainingArguments(
@@ -103,7 +103,7 @@ training_args = TrainingArguments(
     num_train_epochs=epoch_num,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
-    eval_steps = eval_step,
+    eval_steps=eval_step,
     save_steps=save_step,
     save_strategy='steps',
     evaluation_strategy='steps',
@@ -112,8 +112,11 @@ training_args = TrainingArguments(
     seed=random_seed,
     metric_for_best_model='eval_loss',
     load_best_model_at_end=True,
-    save_total_limit=1
-    )
+    save_total_limit=1,
+    fp16=True,  # Enable mixed precision training
+    use_ipex=True if accelerator.distributed_type == "IPEX" else False,
+    use_cpu=True if accelerator.distributed_type == "CPU" else False,
+)
 
 trainer = Trainer(
     model=model,
@@ -122,14 +125,21 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
     callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stop)],
-    
+)
+
+# Prepare the model and data loaders
+model, train_dataloader, eval_dataloader = accelerator.prepare(
+    model, trainer.get_train_dataloader(), trainer.get_eval_dataloader(eval_dataset)
 )
 
 print(f'*'*30)
 print(f'Training begin.')
 trainer.train()
 
-trainer.save_model(model_output_dir+"last-step/")
+# Save the model using accelerator
+accelerator.wait_for_everyone()
+unwrapped_model = accelerator.unwrap_model(model)
+accelerator.save(unwrapped_model.state_dict(), model_output_dir + "last-step/model.pt")
 print(f'Model saved in {model_output_dir+"last-step/"}')
 print(f'*'*30)
 print(f'Training done.')

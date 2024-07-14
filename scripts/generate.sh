@@ -1,6 +1,6 @@
-dataset_name="rockyou"
+dataset_name="4iq"
 cleaned_dataset="./dataset/${dataset_name}-cleaned.txt"
-model_path="./model/last-step/"
+model_path="./model/checkpoint-384000/"
 output_path="./generate/"
 
 # 1. Get patterns rate
