@@ -1,4 +1,4 @@
-dataset_name="rockyou"
+dataset_name="4iq"
 original_dataset="./dataset/${dataset_name}.txt"
 cleaned_dataset="./dataset/${dataset_name}-cleaned.txt"
 training_dataset="./dataset/${dataset_name}-cleaned-Train.txt"

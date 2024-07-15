@@ -1,4 +1,4 @@
-dataset_name="rockyou"
+dataset_name="4iq"
 ready4train_dataset="./dataset/${dataset_name}-cleaned-Train-ready.txt"
 
 # 1. generate vocab file
