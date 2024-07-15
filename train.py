@@ -1,5 +1,5 @@
 # This file aims to train a PagPassGPT.
-
+import os
 from tokenizer.char_tokenizer import CharTokenizer
 from transformers import DataCollatorForLanguageModeling
 from datasets import load_dataset
