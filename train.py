@@ -3,12 +3,12 @@ import os
 from tokenizer.char_tokenizer import CharTokenizer
 from transformers import DataCollatorForLanguageModeling
 from datasets import load_dataset
-from transformers import GPT2Config
-from transformers import GPT2LMHeadModel
-from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
+from transformers import GPT2Config, GPT2LMHeadModel, Trainer, TrainingArguments, EarlyStoppingCallback
 import torch
 import time
 import argparse
+
+default_num_processors = os.cpu_count() if os.cpu_count() is not None else 1
 
 parser = argparse.ArgumentParser()
 # file path parameter setting
@@ -19,7 +19,7 @@ parser.add_argument("--log_path", help="directory of log", type=str, default="./
 parser.add_argument("--resume_from_checkpoint", help="path to resume model training from a checkpoint", type=str, default=None)
 # environment parameter setting
 parser.add_argument("--random_seed", help="random seed", type=int, default=42)
-parser.add_argument("--num_processer", help="num of processer (cpu logit cores)", type=int, default=1)
+parser.add_argument("--num_processer", help="num of processer (cpu logit cores)", type=int, default=default_num_processors)
 # model parameter setting
 parser.add_argument("--input_size", help="should be larger than (2*max len of password + 3), default is 32 according to max_len=12", type=int, default=32)
 parser.add_argument("--embed_size", help="embedding size", type=int, default=384)
@@ -122,7 +122,7 @@ training_args = TrainingArguments(
     save_total_limit=1,
     # Enable multi-GPU training
     dataloader_num_workers=num_processer,
-    fp16=True,  # Enable mixed precision training for faster training
+    fp16=torch.cuda.is_available(),  # Enable mixed precision training for faster training
 )
 
 trainer = Trainer(
