@@ -9,6 +9,9 @@ from datasets import load_dataset
 from transformers import GPT2Config, GPT2LMHeadModel, Trainer, TrainingArguments, EarlyStoppingCallback
 from transformers import TrainerCallback, TrainerState, TrainerControl
 
+# Set NCCL environment variables
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_IB_DISABLE"] = "1"
 
 default_num_processors = os.cpu_count() if os.cpu_count() is not None else 1
 
@@ -127,7 +130,7 @@ training_args = TrainingArguments(
     eval_steps=eval_step,
     save_steps=save_step,
     save_strategy='steps',
-    evaluation_strategy='steps',
+    eval_strategy='steps',  # Use the new argument name `eval_strategy`
     prediction_loss_only=True,
     logging_dir=log_dir + time.strftime("%Y%m%d-%H:%M", time.localtime()),
     seed=random_seed,
