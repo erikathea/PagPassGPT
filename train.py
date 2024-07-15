@@ -1,12 +1,14 @@
 # This file aims to train a PagPassGPT.
 import os
+import torch
+import time
+import argparse
 from tokenizer.char_tokenizer import CharTokenizer
 from transformers import DataCollatorForLanguageModeling
 from datasets import load_dataset
 from transformers import GPT2Config, GPT2LMHeadModel, Trainer, TrainingArguments, EarlyStoppingCallback
-import torch
-import time
-import argparse
+from transformers import TrainerCallback, TrainerState, TrainerControl
+
 
 default_num_processors = os.cpu_count() if os.cpu_count() is not None else 1
 
@@ -54,6 +56,18 @@ batch_size = args.batch_size
 eval_step = args.eval_step
 save_step = args.save_step
 early_stop = args.early_stop
+
+class TimeLimitCallback(TrainerCallback):
+    def __init__(self, time_limit):
+        self.time_limit = time_limit
+        self.start_time = time.time()
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time
+        if elapsed_time > self.time_limit:
+            print(f"Stopping training as the time limit of {self.time_limit} seconds has been exceeded.")
+            control.should_training_stop = True
 
 print(f'Load tokenizer.')
 tokenizer = CharTokenizer(vocab_file=vocab_file, 
@@ -125,13 +139,14 @@ training_args = TrainingArguments(
     fp16=torch.cuda.is_available(),  # Enable mixed precision training for faster training
 )
 
+time_limit = 300
 trainer = Trainer(
     model=model,
     args=training_args,
     data_collator=data_collator,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stop)],
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stop), TimeLimitCallback(time_limit)],
 )
 
 print(f'*'*30)
