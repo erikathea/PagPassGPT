@@ -26,7 +26,7 @@ class CharTokenizer(PreTrainedTokenizer):
             with open(vocab_file, encoding="utf-8") as vocab_handle:
                 self.encoder = json.load(vocab_handle)
                 # Debug: Confirm encoder is loaded
-                print(f"Encoder loaded: {self.encoder}")
+                #print(f"Encoder loaded: {self.encoder}")
         except FileNotFoundError:
             raise ValueError(f"Vocab file {vocab_file} not found.")
         except json.JSONDecodeError:
@@ -53,11 +53,11 @@ class CharTokenizer(PreTrainedTokenizer):
         self.padding_side = padding_side
 
         # Debug: Check token ids
-        print(f"BOS token ID: {self.bos_token_id}")
-        print(f"EOS token ID: {self.eos_token_id}")
-        print(f"SEP token ID: {self.sep_token_id}")
-        print(f"PAD token ID: {self.pad_token_id}")
-        print(f"UNK token ID: {self.unk_token_id}")
+        #print(f"BOS token ID: {self.bos_token_id}")
+        #print(f"EOS token ID: {self.eos_token_id}")
+        #print(f"SEP token ID: {self.sep_token_id}")
+        #print(f"PAD token ID: {self.pad_token_id}")
+        #print(f"UNK token ID: {self.unk_token_id}")
 
     @property
     def vocab_size(self):
