@@ -18,7 +18,7 @@ Paper: https://arxiv.org/abs/2404.04886v1
 ```shell
 pip install torch transformers datasets
 pip install transformers[torch]
-pip install zxcvbn
+pip install zxcvbn levenshtein
 ```
 
 ## 2 How to use

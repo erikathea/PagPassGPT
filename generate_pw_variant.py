@@ -13,6 +13,7 @@ import re
 import logging
 import os
 from zxcvbn import zxcvbn
+from Levenshtein import distance, ratio
 
 MAX_LEN = 32
 logging.basicConfig(filename='./generate_pw_variant.log', level=logging.INFO,
@@ -247,5 +248,8 @@ if __name__ == '__main__':
             log_likelihood = compute_log_likelihood(model, input_ids)
             pattern, pw_variant = tokenizer.decode(tokenizer_forgen_result).split(' ', 1)
             pw_zxcvbn = zxcvbn(pw_variant)
-            logger.info(f'\t{orig_pw}\t{orig_pattern}\t{orig_zxcvbn['score']}\t{orig_zxcvbn['guesses']}\t{pw_variant}\t{pattern}\t{pw_zxcvbn['score']}\t{pw_zxcvbn['guesses']}\t{log_likelihood}')
+            edit_distance = distance(orig_pw, pw_variant)
+            similarity_ratio = ratio(orig_pw, pw_variant)
+
+            logger.info(f'\t{orig_pw}\t{orig_pattern}\t{orig_zxcvbn['score']}\t{orig_zxcvbn['guesses']}\t{pw_variant}\t{pattern}\t{pw_zxcvbn['score']}\t{pw_zxcvbn['guesses']}\t{log_likelihood}\t{edit_distance}\t{similarity_ratio}')
 
