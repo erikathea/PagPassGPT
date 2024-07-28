@@ -12,6 +12,7 @@ import random
 import re
 import logging
 import os
+from zxcvbn import zxcvbn
 
 MAX_LEN = 32
 logging.basicConfig(filename='./generate_pw_variant.log', level=logging.INFO,
@@ -236,10 +237,15 @@ if __name__ == '__main__':
         print(pw_variant)
 
     if args.compute_loglikelihood:
+        orig_pw= args.input_password
+        orig_zxcvbn = zxcvbn(orig_pw)
+        orig_pattern = ''.join(get_pattern(orig_pw))
+
         tokenizer_forgen_results = [tokenizer.encode_forgen(input_text) for input_text in inputs]
         for tokenizer_forgen_result in tokenizer_forgen_results:
             input_ids=tokenizer_forgen_result.view([1, -1])
             log_likelihood = compute_log_likelihood(model, input_ids)
             pattern, pw_variant = tokenizer.decode(tokenizer_forgen_result).split(' ', 1)
-            logger.info(f'{pw_variant}  {pattern}   Log Likelihood: {log_likelihood}')
+            pw_zxcvbn = zxcvbn(pw_variant)
+            logger.info(f'\t{orig_pw}\t{orig_pattern}\t{orig_zxcvbn['score']}\t{orig_zxcvbn['guesses']}\t{pw_variant}\t{pattern}\t{pw_zxcvbn['score']}\t{pw_zxcvbn['guesses']}\t{log_likelihood}')
 
