@@ -1,3 +1,13 @@
+# PagPassGPT - Password Variant Generator
+
+To generate password variants from an input:
+
+    python generate_pw_variant.py --input_password="password" --generate_num="10" --compute_loglikelihood
+
+The script is expecting `./tokenizer/vocab.json'` and `./model/checkpoint-384000`
+
+Remove `--compute_loglikelihood` to skip computation and speed-up runtime.
+
 # PagPassGPT
 PagPassGPT: Pattern Guided Password Guessing via Generative Pretrained Transformer
 
@@ -33,3 +43,4 @@ sh ./scripts/generate.sh
 ```
 
 In this shell, you can choose to use DC-GEN or not by changing just one line.
+
