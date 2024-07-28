@@ -160,6 +160,7 @@ if __name__ == '__main__':
     parser.add_argument("--vocabfile_path", help="path of vocab file", type=str, default='./tokenizer/vocab.json')
     parser.add_argument("--input_password", help="password to be used for creating variants", type=str, required=True)
     parser.add_argument("--generate_num", help="query budget per pattern", default=10, type=int)
+    parser.add_argument("--compute_loglikelihood", help="compute log likelihood of the passwords", action="store_true")
     args = parser.parse_args()
 
     model_path = args.model_path
@@ -223,16 +224,22 @@ if __name__ == '__main__':
                 password = ensure_case_diversity(pw_variant)
                 passwords.add(password)
 
+    num = args.generate_num
+    if num > len(passwords):
+        num = len(passwords)
+    logger.info(f'====selecting {num} from {len(passwords)} password variants')
+    selected_passwords = random.sample(list(passwords), num)
     inputs = set()
-    for pw_variant in sorted(passwords):
+    for pw_variant in sorted(selected_passwords):
         fp = ' '.join(get_pattern(pw_variant))
         inputs.add(fp + ' <SEP> ' + ' '.join(list(pw_variant)))
         print(pw_variant)
 
-    tokenizer_forgen_results = [tokenizer.encode_forgen(input_text) for input_text in inputs]
-    for tokenizer_forgen_result in tokenizer_forgen_results:
-        input_ids=tokenizer_forgen_result.view([1, -1])
-        log_likelihood = compute_log_likelihood(model, input_ids)
-        pattern, pw_variant = tokenizer.decode(tokenizer_forgen_result).split(' ', 1)
-        logger.info(f'{pw_variant}  {pattern}   Log Likelihood: {log_likelihood}')
+    if args.compute_loglikelihood:
+        tokenizer_forgen_results = [tokenizer.encode_forgen(input_text) for input_text in inputs]
+        for tokenizer_forgen_result in tokenizer_forgen_results:
+            input_ids=tokenizer_forgen_result.view([1, -1])
+            log_likelihood = compute_log_likelihood(model, input_ids)
+            pattern, pw_variant = tokenizer.decode(tokenizer_forgen_result).split(' ', 1)
+            logger.info(f'{pw_variant}  {pattern}   Log Likelihood: {log_likelihood}')
 
