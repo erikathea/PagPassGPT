@@ -12,6 +12,7 @@ import random
 import re
 import logging
 import os
+import string
 from zxcvbn import zxcvbn
 from Levenshtein import distance, ratio
 
@@ -134,17 +135,21 @@ def add_lowercase(chars):
     change_random_char(chars, str.isupper, str.lower)
 
 def change_random_char(chars, condition, transform):
+    allowed_chars = string.ascii_letters
     eligible_indices = [i for i, char in enumerate(chars) if condition(char)]
     if eligible_indices:
         index = random.choice(eligible_indices)
-        chars[index] = transform(chars[index])
+        transformed_char = transform(chars[index])
+        # Ensure the transformed character is in the allowed set
+        while transformed_char not in allowed_chars:
+            transformed_char = transform(random.choice(list(allowed_chars)))
+        chars[index] = transformed_char
 
 def valid_format(password):
     pattern = r'^(?=.*[!@#$%^&*()_+\-=[\]{}|;:\'",.<>/?`~])(?=.*\d).+$'
     return bool(re.match(pattern, password))
 
 def compute_log_likelihood(model, input_ids):
-    model.eval()
     with torch.no_grad():
         outputs = model(input_ids, labels=input_ids)  # The labels parameter causes the model to return the loss
         log_likelihood = outputs.loss.item()  # The loss is the negative log likelihood of the sequence
@@ -168,6 +173,7 @@ if __name__ == '__main__':
     model_path = args.model_path
     vocab_file = args.vocabfile_path
     pw = args.input_password
+    orig_pw= args.input_password
 
     logger = logging.getLogger()
     logger.info(f"Script started with arguments: {vars(args)}")
@@ -184,6 +190,7 @@ if __name__ == '__main__':
     logger.info(f'Loaded: {tokenizer.encoder}')
 
     model = GPT2LMHeadModel.from_pretrained(model_path)
+    model.eval()
     inputs = set()
 
     ip = ' '.join(get_pattern(pw))
@@ -206,11 +213,12 @@ if __name__ == '__main__':
     logger.info(f"{pw} patterns: {fps}")
     for fp in fps:
         inputs.add(fp + ' <SEP> ' + ' '.join(list(pw)))
-
+    logger.info(f"input tokens: {inputs}")
     tokenizer_forgen_results = [tokenizer.encode_forgen(input_text) for input_text in inputs]
     passwords = set()
     
     for tokenizer_forgen_result in tokenizer_forgen_results:
+        start_time = time.time()
         input_ids=tokenizer_forgen_result.view([1, -1])
         outputs = model.generate(
             input_ids=input_ids,
@@ -219,10 +227,12 @@ if __name__ == '__main__':
             do_sample=True,
             num_return_sequences=args.generate_num
         )
+        end_time = time.time()
+        logger.info(f'-- generation time: {(end_time - start_time):.6f} secs')
         decoded_outputs = tokenizer.batch_decode(outputs)
         for output in decoded_outputs:
             pattern, pw_variant = output.split(' ', 1)
-            if valid_format(pw_variant):
+            if valid_format(pw_variant) and len(pw_variant) >= 8 and orig_pw is not pw_variant:
                 password = ensure_case_diversity(pw_variant)
                 passwords.add(password)
 
@@ -238,10 +248,9 @@ if __name__ == '__main__':
         print(pw_variant)
 
     if args.compute_loglikelihood:
-        orig_pw= args.input_password
         orig_zxcvbn = zxcvbn(orig_pw)
         orig_pattern = ''.join(get_pattern(orig_pw))
-
+        logger.info(f'selected input tokens: {inputs}')
         tokenizer_forgen_results = [tokenizer.encode_forgen(input_text) for input_text in inputs]
         for tokenizer_forgen_result in tokenizer_forgen_results:
             input_ids=tokenizer_forgen_result.view([1, -1])
