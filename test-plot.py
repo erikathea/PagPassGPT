@@ -3,7 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Read the file
-with open('test-L4N2S2.csv', 'r') as file:
+fpt = 'S1L3S1N1*'
+csv_file = "test-"+fpt+".csv"
+print(csv_file)
+with open(csv_file, 'r') as file:
     lines = file.readlines()
 
 # Process the lines
@@ -76,7 +79,7 @@ plt.scatter(df_filtered.index, df_filtered['composite_similarity_score'], label=
 plt.ylim(0, 1.1)  # Set y-axis limits
 plt.xlabel('Index')
 plt.ylabel('Score')
-plt.title('L4N2S2 Random Passwords')
+plt.title(fpt+' Password Variants')
 plt.legend()
 
 plt.grid(True, axis='y', linestyle='--', alpha=0.7)
