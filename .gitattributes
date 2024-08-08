@@ -1,1 +1,2 @@
 model/checkpoint-384000/optimizer.pt filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
